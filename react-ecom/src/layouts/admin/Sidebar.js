@@ -100,7 +100,7 @@ const Sidebar =() => {
                         </Link>
                       </li>
                       <li>
-                        <Link to="/admin/view-product">
+                        <Link to="/admin/show/:id">
                           <span className="sub-item">View Product</span>
                         </Link>
                       </li>

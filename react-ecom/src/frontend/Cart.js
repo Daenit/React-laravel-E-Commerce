@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Button, ListGroup, Alert, Spinner } from 'react-bootstrap';
 
 const Cart = () => {
     const [cart, setCart] = useState({ items: [], summary: {} });
     const [loading, setLoading] = useState(false);
     const [cartLoading, setCartLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [loadingItems, setLoadingItems] = useState({}); // Track loading state for each item
+    const [actionError, setActionError] = useState(null); // Track errors for cart actions
 
     useEffect(() => {
         fetchCart();
@@ -28,65 +31,71 @@ const Cart = () => {
 
     const updateQuantity = async (id, quantity) => {
         if (quantity < 1) return;
-        setLoading(true);
+
+        setLoadingItems(prev => ({ ...prev, [id]: true })); // Mark item as loading
+        setActionError(null); // Reset action error
         try {
             await axios.put(`http://127.0.0.1:8000/api/cart/update/${id}`, { quantity });
             fetchCart();
         } catch (error) {
             console.error('Error updating cart:', error);
+            setActionError('Failed to update quantity.');
         } finally {
-            setLoading(false);
+            setLoadingItems(prev => ({ ...prev, [id]: false })); // Unmark item as loading
         }
     };
 
     const removeItem = async (id) => {
-        setLoading(true);
+        setLoadingItems(prev => ({ ...prev, [id]: true })); // Mark item as loading
+        setActionError(null); // Reset action error
         try {
             await axios.delete(`http://127.0.0.1:8000/api/cart/remove/${id}`);
             fetchCart();
         } catch (error) {
             console.error('Error removing item:', error);
+            setActionError('Failed to remove item.');
         } finally {
-            setLoading(false);
+            setLoadingItems(prev => ({ ...prev, [id]: false })); // Unmark item as loading
         }
     };
 
     return (
-    <>
-        <div className="container-fluid page-header mb-5">
-            <div className="container">
-                <h1 className="display-3 mb-3">Add to Cart</h1>
-                <nav aria-label="breadcrumb">
-                    <ol className="breadcrumb mb-0">
-                        <li className="breadcrumb-item"><a className="text-body" href="/">Home</a></li>
-                        <li className="breadcrumb-item"><a className="text-body" href="/product">Product</a></li>
-                        <li className="breadcrumb-item active">Cart</li>
-                    </ol>
-                </nav>
+        <>
+            <div className="container-fluid page-header mb-5">
+                <div className="container">
+                    <h1 className="display-3 mb-3">Shopping Cart</h1>
+                    <nav aria-label="breadcrumb">
+                        <ol className="breadcrumb mb-0">
+                            <li className="breadcrumb-item"><Link to="/" className="text-body">Home</Link></li>
+                            <li className="breadcrumb-item"><Link to="/products" className="text-body">Products</Link></li>
+                            <li className="breadcrumb-item active">Cart</li>
+                        </ol>
+                    </nav>
+                </div>
             </div>
-        </div>
 
-        <div className="container py-5">
-            <h1 className="mb-4 text-center">My Cart ({cart.items.length})</h1>
+            <Container className="my-5">
+                <h1 className="mb-4 text-center">My Cart ({cart.items.length})</h1>
 
-            {cartLoading ? (
-                <div className="text-center">
-                    <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Loading...</span>
+                {cartLoading ? (
+                    <div className="text-center my-5">
+                        <Spinner animation="border" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </Spinner>
                     </div>
-                </div>
-            ) : error ? (
-                <div className="alert alert-danger text-center">{error}</div>
-            ) : cart.items.length === 0 ? (
-                <div className="text-center">
-                    <h5 className="text-muted">Your cart is empty.</h5>
-                    <Link to="/product" className="btn btn-primary rounded-pill mt-3">
-                        Shop Now
-                    </Link>
-                </div>
-            ) : (
-                <div className="row">
-                    <div className="col-md-8">
+                ) : error ? (
+                    <Alert variant="danger" className="text-center">{error}</Alert>
+                ) : cart.items.length === 0 ? (
+                    <div className="text-center py-5">
+                        <h5 className="text-muted mb-4">Your cart is empty</h5>
+                        <Button as={Link} to="/products" variant="primary" size="lg" className="rounded-pill">
+                            Continue Shopping
+                        </Button>
+                    </div>
+                ) : (
+                    <Row>
+                        <div className="col-md-8">
+                        {actionError && <Alert variant="danger" className="text-center">{actionError}</Alert>}
                         {cart.items.map(item => (
                             <div key={item.id} className="card mb-4 shadow-sm">
                                 <div className="row g-0">
@@ -111,7 +120,7 @@ const Cart = () => {
                                                 <button 
                                                     className="btn btn-outline-secondary rounded-pill py-2 px-3 ms-3"
                                                     onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                    disabled={loading || item.quantity <= 1}
+                                                    disabled={loadingItems[item.id] || item.quantity <= 1}
                                                 >
                                                     -
                                                 </button>
@@ -119,7 +128,7 @@ const Cart = () => {
                                                 <button 
                                                     className="btn btn-outline-primary rounded-pill py-2 px-3 ms-3"
                                                     onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                    disabled={loading}
+                                                    disabled={loadingItems[item.id]}
                                                 >
                                                     +
                                                 </button>
@@ -128,7 +137,7 @@ const Cart = () => {
                                             <button 
                                                 className="btn btn-outline-danger rounded-pill py-2 px-5 ms-3 mt-3"
                                                 onClick={() => removeItem(item.id)}
-                                                disabled={loading}
+                                                disabled={loadingItems[item.id]}
                                             >
                                                 Remove
                                             </button>
@@ -139,49 +148,54 @@ const Cart = () => {
                         ))}
                     </div>
 
-                    <div className="col-md-4">
-                        <div className="card shadow-sm">
-                            <div className="card-body">
-                                <h5 className="card-title">Order Summary</h5>
+                        <Col lg={4}>
+                            <Card className="shadow-sm sticky-top" style={{ top: '20px' }}>
+                                <Card.Body>
+                                    <Card.Title className="mb-4 fs-3">Order Summary</Card.Title>
+                                    
+                                    <ListGroup variant="flush" className="mb-4">
+                                        <ListGroup.Item className="d-flex justify-content-between">
+                                            <span>Subtotal:</span>
+                                            <span>₹{cart.summary.subtotal?.toFixed(2)}</span>
+                                        </ListGroup.Item>
+                                        
+                                        <ListGroup.Item className="d-flex justify-content-between">
+                                            <span>Tax (5%):</span>
+                                            <span>₹{cart.summary.tax?.toFixed(2)}</span>
+                                        </ListGroup.Item>
+                                        
+                                        <ListGroup.Item className="d-flex justify-content-between">
+                                            <span>Service Fee:</span>
+                                            <span>₹{cart.summary.service?.toFixed(2)}</span>
+                                        </ListGroup.Item>
+                                        
+                                        <ListGroup.Item className="d-flex justify-content-between fs-5 fw-bold">
+                                            <span>Total:</span>
+                                            <span>₹{cart.summary.total?.toFixed(2)}</span>
+                                        </ListGroup.Item>
+                                    </ListGroup>
 
-                                <div className="mb-3">
-                                    <p className="d-flex justify-content-between">
-                                        <span>Sub Total:</span>
-                                        <span>₹{cart.summary.subtotal?.toFixed(1) || 0.0}</span>
-                                    </p>
-                                    <p className="d-flex justify-content-between">
-                                        <span>Tax (5%):</span>
-                                        <span>₹{cart.summary.tax?.toFixed(1) || 0.0}</span>
-                                    </p>
-                                    <p className="d-flex justify-content-between">
-                                        <span>Service Fee:</span>
-                                        <span>₹{cart.summary.service || 0.0}</span>
-                                    </p>
-                                    <hr />
-                                    <p className="d-flex justify-content-between fw-bold">
-                                        <span>Total:</span>
-                                        <span>₹{cart.summary.total?.toFixed(1) || 0.0}</span>
-                                    </p>
-                                </div>
+                                    <Alert variant="info" className="text-center">
+                                        Get extra 5% OFF* with Credit card payments
+                                    </Alert>
 
-                                <div className="alert alert-info">
-                                    GET EXTRA 5% OFF* with Credit card. T&C.
-                                </div>
-
-                                <Link 
-                                    to="/checkout"
-                                    className="btn btn-primary w-100 rounded-pill"
-                                    disabled={cart.items.length === 0}
-                                >
-                                    PROCEED TO CHECKOUT
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    </>
+                                    <Button
+                                        as={Link}
+                                        to="/checkout"
+                                        variant="primary"
+                                        size="lg"
+                                        className="w-100 rounded py-3"
+                                        disabled={cart.items.length === 0}
+                                    >
+                                        Proceed to Checkout
+                                    </Button>
+                                </Card.Body>
+                            </Card>
+                        </Col>
+                    </Row>
+                )}
+            </Container>
+        </>
     );
 };
 
